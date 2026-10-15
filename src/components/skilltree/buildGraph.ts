@@ -1,31 +1,26 @@
 import type { Edge } from "@xyflow/react";
-import { fields } from "../../data/fields";
 import { site } from "../../data/site";
 import type { Project } from "../../data/types";
 import { deriveSkills, type DerivedSkill } from "../../lib/deriveSkills";
 import { getProfileLevel } from "../../lib/profileLevel";
+import { groupBySector } from "../../lib/sectors";
 import type { CenterNodeType } from "./CenterNode";
 import type { HubNodeType } from "./HubNode";
 import type { SkillNodeType } from "./SkillNode";
+import { COLORS } from "./theme";
 
 export type GraphNode = CenterNodeType | HubNodeType | SkillNodeType;
 
-// Medidas (px) dos nós, usadas para os centrar nas posições calculadas
-const CENTER = { w: 176, h: 176 };
-const HUB = { w: 144, h: 92, radius: 190 };
-const SKILL = { w: 132, h: 112, firstRing: 340, ringGap: 170, gap: 24 };
-const SPREAD = 0.72; // fração do setor usada para espalhar os nós
+// 'next': mostra as desbloqueadas e o próximo passo de cada uma (árvore limpa)
+// 'all': mostra todas, incluindo as bloqueadas sem ligação a nada desbloqueado
+const LOCKED_MODE: "next" | "all" = "next";
 
-const LOCKED_EDGE = {
-  stroke: "#334155",
-  strokeWidth: 1.5,
-  strokeDasharray: "6 6",
-};
-const activeEdge = (color: string) => ({
-  stroke: color,
-  strokeWidth: 2.5,
-  filter: `drop-shadow(0 0 4px ${color})`,
-});
+// Medidas (px) dos nós, usadas para os centrar nas posições calculadas
+const CENTER = { w: 160, h: 160 };
+const HUB = { w: 128, h: 52, minRadius: 190, maxRadius: 700, gap: 28 };
+const SKILL = { w: 132, h: 76, ringGap: 140, gap: 24, hubClearance: 130 };
+const SPREAD = 0.86; // fração do setor usada para espalhar os nós
+const BASE_WEIGHT = 2; // peso mínimo de um setor, mesmo sem skills
 
 const rad = (deg: number) => (deg * Math.PI) / 180;
 const at = (angle: number, radius: number, w: number, h: number) => ({
@@ -33,18 +28,14 @@ const at = (angle: number, radius: number, w: number, h: number) => ({
   y: Math.sin(angle) * radius - h / 2,
 });
 
-const makeEdge = (
-  source: string,
-  target: string,
-  color: string,
-  active: boolean,
-): Edge => ({
+const makeEdge = (source: string, target: string, active: boolean): Edge => ({
   id: `${source}>${target}`,
   source,
   target,
   type: "straight",
-  animated: active,
-  style: active ? activeEdge(color) : LOCKED_EDGE,
+  style: active
+    ? { stroke: COLORS.lineActive, strokeWidth: 1.5 }
+    : { stroke: COLORS.line, strokeWidth: 1, strokeDasharray: "4 6" },
 });
 
 interface Placed {
@@ -124,13 +115,44 @@ function layoutField(
 }
 
 export function buildGraph(projects: Project[]) {
-  const skills = deriveSkills(projects);
-  const byId = new Map(skills.map((s) => [s.id, s]));
-  const colorOf = new Map(fields.map((f) => [f.id, f.color]));
+  const { sectors, skills: all } = groupBySector(deriveSkills(projects));
+  const byId = new Map(all.map((s) => [s.id, s]));
   const { formation, experience, level } = getProfileLevel();
 
-  const step = 360 / fields.length;
-  let maxRadius = HUB.radius;
+  // Skills desenhadas: desbloqueadas, ou (modo 'next') o próximo passo de uma desbloqueada
+  const isShown = (s: DerivedSkill) =>
+    LOCKED_MODE === "all" ||
+    s.level > 0 ||
+    s.requires.some((r) => (byId.get(r)?.level ?? 0) > 0);
+  const skills = all.filter(isShown);
+  const shownIds = new Set(skills.map((s) => s.id));
+
+  // Cada setor ocupa uma fatia proporcional ao nº de skills desenhadas
+  const weights = sectors.map(
+    (f) => BASE_WEIGHT + skills.filter((s) => s.field === f.id).length,
+  );
+  const totalWeight = weights.reduce((a, b) => a + b, 0);
+  const spans = weights.map((w) => rad((360 * w) / totalWeight));
+
+  // O 1.º setor termina no topo; os seguintes seguem no sentido dos ponteiros do relógio
+  const starts: number[] = [];
+  let cursor = rad(-90) - spans[0];
+  spans.forEach((span) => {
+    starts.push(cursor);
+    cursor += span;
+  });
+
+  // Raio dos campos: o mínimo para os vizinhos não se sobreporem
+  const minSpan = Math.min(...spans);
+  const hubRadius = Math.min(
+    HUB.maxRadius,
+    Math.max(
+      HUB.minRadius,
+      (HUB.w + HUB.gap) / (2 * Math.sin(Math.min(minSpan, Math.PI) / 2)),
+    ),
+  );
+  const firstRing = hubRadius + SKILL.hubClearance;
+  let maxRadius = hubRadius;
 
   const nodes: GraphNode[] = [
     {
@@ -143,29 +165,23 @@ export function buildGraph(projects: Project[]) {
   ];
   const edges: Edge[] = [];
 
-  fields.forEach((field, i) => {
-    // 1.º campo no setor superior esquerdo, seguintes no sentido dos ponteiros do relógio
-    const sectorCenter = rad(-90 - step / 2 + i * step);
+  sectors.forEach((field, i) => {
+    const sectorCenter = starts[i] + spans[i] / 2;
     const inField = skills.filter((s) => s.field === field.id);
-    const done = inField.filter((s) => s.level > 0).length;
+    const catalog = all.filter((s) => s.field === field.id); // o campo conta o catálogo todo
+    const done = catalog.filter((s) => s.level > 0).length;
     const hubId = `hub-${field.id}`;
 
     nodes.push({
       id: hubId,
       type: "hub",
-      position: at(sectorCenter, HUB.radius, HUB.w, HUB.h),
+      position: at(sectorCenter, hubRadius, HUB.w, HUB.h),
       draggable: false,
-      data: {
-        name: field.name,
-        icon: field.icon,
-        color: field.color,
-        done,
-        total: inField.length,
-      },
+      data: { name: field.name, done, total: catalog.length },
     });
-    edges.push(makeEdge("center", hubId, field.color, done > 0));
+    edges.push(makeEdge("center", hubId, done > 0));
 
-    const placed = layoutField(inField, sectorCenter, rad(step) * SPREAD);
+    const placed = layoutField(inField, sectorCenter, spans[i] * SPREAD);
 
     // Raio de cada anel: o mínimo para os nós vizinhos não se sobreporem
     const maxDepth = Math.max(-1, ...placed.map((p) => p.depth));
@@ -182,7 +198,7 @@ export function buildGraph(projects: Project[]) {
         );
       }
       radii[d] = Math.max(
-        d === 0 ? SKILL.firstRing : radii[d - 1] + SKILL.ringGap,
+        d === 0 ? firstRing : radii[d - 1] + SKILL.ringGap,
         needed,
       );
       maxRadius = Math.max(maxRadius, radii[d]);
@@ -194,46 +210,23 @@ export function buildGraph(projects: Project[]) {
         type: "skill",
         position: at(angle, radii[depth], SKILL.w, SKILL.h),
         draggable: false,
-        data: {
-          name: s.name,
-          category: s.category,
-          color: field.color,
-          level: s.level,
-          count: s.count,
-        },
+        data: { name: s.name, level: s.level, count: s.count },
       });
 
-      if (depth === 0)
-        edges.push(makeEdge(hubId, s.id, field.color, s.level > 0));
+      if (depth === 0) edges.push(makeEdge(hubId, s.id, s.level > 0));
       s.requires.forEach((r) => {
         const req = byId.get(r);
-        if (!req) return;
-        edges.push(
-          makeEdge(
-            r,
-            s.id,
-            colorOf.get(req.field) ?? field.color,
-            req.level > 0 && s.level > 0,
-          ),
-        );
+        if (!req || !shownIds.has(r)) return;
+        edges.push(makeEdge(r, s.id, req.level > 0 && s.level > 0));
       });
     });
   });
 
-  skills
-    .filter((s) => !colorOf.has(s.field))
-    .forEach((s) =>
-      console.warn(
-        `[skill tree] "${s.id}" usa o campo "${s.field}", que não existe em fields.ts`,
-      ),
-    );
-
-  // Linhas que separam os setores (como no esboço)
-  const dividers = fields.map((_, i) => {
-    const a = rad(-90 + i * step);
+  // Linhas que separam os setores
+  const dividers = starts.map((a, i) => {
     const len = maxRadius + 100;
     return { id: `divider-${i}`, x: Math.cos(a) * len, y: Math.sin(a) * len };
   });
 
-  return { nodes, edges, dividers };
+  return { nodes, edges, dividers, radius: maxRadius + SKILL.w };
 }

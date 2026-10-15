@@ -3,6 +3,7 @@ import { useNavigate } from "react-router";
 import { useTranslation } from "react-i18next";
 import type { Session } from "@supabase/supabase-js";
 import type { Project } from "../../data/types";
+import { removeProjectImages } from "../../lib/images";
 import { supabase } from "../../lib/supabase";
 import { useProjects } from "../../lib/projectsContext";
 import ProjectForm from "./ProjectForm";
@@ -29,8 +30,12 @@ export default function RealAdmin({ session }: { session: Session }) {
       .from("projects")
       .delete()
       .eq("slug", project.slug);
-    if (error) window.alert(error.message);
-    else await refresh();
+    if (error) {
+      window.alert(error.message);
+      return;
+    }
+    await removeProjectImages(project.gallery.map((b) => b.image));
+    await refresh();
   }
 
   async function saved() {
@@ -53,7 +58,7 @@ export default function RealAdmin({ session }: { session: Session }) {
           projects={projects}
           onNew={() => setEditing("new")}
           onEdit={setEditing}
-          onDelete={(p) => void remove(p)}
+          onDelete={(p: Project) => void remove(p)}
         />
       ) : (
         <ProjectForm

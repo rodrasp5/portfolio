@@ -2,13 +2,15 @@ import { useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
 import { fields } from "../../data/fields";
 import { skills } from "../../data/skills";
-import type { Project, ProjectStatus } from "../../data/types";
+import type { GalleryBlock, Project, ProjectStatus } from "../../data/types";
 import {
   useLocalized,
   type Lang,
   type Localizable,
 } from "../../i18n/useLocalized";
+import { removeProjectImages, uploadProjectImage } from "../../lib/images";
 import { supabase } from "../../lib/supabase";
+import GalleryEditor, { type BlockDraft } from "./GalleryEditor";
 
 const input = "w-full rounded border border-slate-300 px-3 py-2";
 const label = "mb-1 block text-sm font-medium";
@@ -31,6 +33,18 @@ const slugify = (s: string) =>
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
+
+const toCaption = (pt: string, en: string): Localizable => {
+  const p = pt.trim();
+  const e = en.trim();
+  if (!p && !e) return "";
+  return { pt: p || e, en: e || p };
+};
+
+const messageOf = (err: unknown) =>
+  err && typeof err === "object" && "message" in err
+    ? String(err.message)
+    : "Erro desconhecido";
 
 interface Props {
   project?: Project; // sem project = novo
@@ -66,6 +80,16 @@ export default function ProjectForm({ project, onSaved, onCancel }: Props) {
       url: k.url,
     })) ?? [],
   );
+  const [blocks, setBlocks] = useState<BlockDraft[]>(() =>
+    (project?.gallery ?? []).map((b) => ({
+      key: crypto.randomUUID(),
+      image: b.image,
+      file: null,
+      captionPt: pick(b.caption, "pt"),
+      captionEn: pick(b.caption, "en"),
+      side: b.side,
+    })),
+  );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -95,34 +119,65 @@ export default function ProjectForm({ project, onSaved, onCancel }: Props) {
     setBusy(true);
     setError("");
 
-    const row: Project = {
-      slug,
-      name: name.trim(),
-      description: { pt: descPt.trim(), en: descEn.trim() || descPt.trim() },
-      status,
-      gallery: project?.gallery ?? [], // a galeria é editada no passo das imagens
-      links: links
-        .filter((k) => k.url.trim())
-        .map((k) => {
-          const pt = k.labelPt.trim() || "Link";
-          const en = k.labelEn.trim();
-          return {
-            label: en && en !== pt ? { pt, en } : pt,
-            url: k.url.trim(),
-          };
-        }),
-      skills: [...selected],
-      date,
-      featured,
-    };
+    const uploaded: string[] = []; // imagens enviadas nesta tentativa (apagadas se falhar)
+    const gallery: GalleryBlock[] = [];
 
-    const { error: err } = project
-      ? await supabase.from("projects").update(row).eq("slug", project.slug)
-      : await supabase.from("projects").insert(row);
+    try {
+      // 1. Envia as imagens novas, por ordem
+      for (const b of blocks) {
+        let image = b.image;
+        if (b.file) {
+          image = await uploadProjectImage(b.file, slug);
+          uploaded.push(image);
+        }
+        gallery.push({
+          image,
+          caption: toCaption(b.captionPt, b.captionEn),
+          side: b.side,
+        });
+      }
 
-    setBusy(false);
-    if (err) setError(err.message);
-    else await onSaved();
+      // 2. Guarda o projeto
+      const row: Project = {
+        slug,
+        name: name.trim(),
+        description: { pt: descPt.trim(), en: descEn.trim() || descPt.trim() },
+        status,
+        gallery,
+        links: links
+          .filter((k) => k.url.trim())
+          .map((k) => {
+            const pt = k.labelPt.trim() || "Link";
+            const en = k.labelEn.trim();
+            return {
+              label: en && en !== pt ? { pt, en } : pt,
+              url: k.url.trim(),
+            };
+          }),
+        skills: [...selected],
+        date,
+        featured,
+      };
+
+      const { error: err } = project
+        ? await supabase.from("projects").update(row).eq("slug", project.slug)
+        : await supabase.from("projects").insert(row);
+      if (err) throw err;
+    } catch (err) {
+      await removeProjectImages(uploaded);
+      setError(messageOf(err));
+      setBusy(false);
+      return;
+    }
+
+    // 3. Apaga do Storage as imagens que foram retiradas da galeria
+    const kept = new Set(gallery.map((g) => g.image));
+    await removeProjectImages(
+      (project?.gallery ?? [])
+        .map((g) => g.image)
+        .filter((url) => !kept.has(url)),
+    );
+    await onSaved();
   }
 
   return (
@@ -215,15 +270,17 @@ export default function ProjectForm({ project, onSaved, onCancel }: Props) {
       </label>
 
       <fieldset>
+        <legend className={label}>{t("admin.fieldGallery")}</legend>
+        <GalleryEditor blocks={blocks} onChange={setBlocks} />
+      </fieldset>
+
+      <fieldset>
         <legend className={label}>{t("admin.fieldSkills")}</legend>
         <div className="space-y-3">
           {fields.map((f) => (
             <div key={f.id}>
-              <p
-                className="mb-1 text-xs font-medium"
-                style={{ color: f.color }}
-              >
-                {f.icon} {l(f.name)}
+              <p className="mb-1 text-xs font-medium text-slate-500">
+                {l(f.name)}
               </p>
               <div className="flex flex-wrap gap-2">
                 {skills

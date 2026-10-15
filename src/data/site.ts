@@ -7,8 +7,9 @@ export const site = {
   },
   photo: '/foto.webp',
   contacts: {
-    email: 'o-teu-email@exemplo.com',
+    email: 'rodrigosantospinto05@gmail.com',
     github: 'https://github.com/rodrasp5',
-    linkedin: 'https://linkedin.com/in/o-teu-perfil',
+    linkedin: 'https://www.linkedin.com/in/rodrigo-pinto-696949414',
+    instagram: 'https://www.instagram.com/o_teu_utilizador',
   },
 }

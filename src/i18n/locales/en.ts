@@ -15,7 +15,7 @@ const en: typeof pt = {
     backHome: "Back to home",
     pageTitle: "Skill tree",
   },
-  view: { toList: "Simplify", toTree: "View tree" },
+  view: { toList: "Simplify", toTree: "View tree", tree: "Tree", list: "List" },
   tree: {
     level: "Lv. {{level}}",
     locked: "Locked",
@@ -49,7 +49,12 @@ const en: typeof pt = {
     present: "present",
     viewCertificate: "View certificate",
   },
-  projects: { title: "Projects" },
+  projects: {
+    title: "Projects",
+    view: "View project",
+    empty: "New projects coming soon.",
+  },
+  project: { back: "Back to projects", notFound: "Project not found." },
   status: { concluido: "Completed", producao: "In production" },
   footer: { title: "Contact", cta: "Let's talk?" },
   login: {
@@ -88,6 +93,7 @@ const en: typeof pt = {
     fieldStatus: "Status",
     fieldDate: "Date",
     fieldFeatured: "Featured",
+    fieldGallery: "Gallery",
     fieldSkills: "Skills used",
     fieldLinks: "Links",
     linkLabelPt: "Label (PT)",
@@ -96,6 +102,16 @@ const en: typeof pt = {
     addLink: "Add link",
     removeLink: "Remove",
     saveError: "Could not save: {{message}}",
+    galleryHint:
+      "The first image is the project cover. The order here is the order on the page.",
+    addImages: "Add images",
+    captionPt: "Text beside the image (PT)",
+    captionEn: "Text beside the image (EN)",
+    sideLeft: "Image on the left",
+    sideRight: "Image on the right",
+    moveUp: "Move up",
+    moveDown: "Move down",
+    removeImage: "Remove",
   },
 };
 

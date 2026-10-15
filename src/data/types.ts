@@ -11,8 +11,6 @@ export type SkillCategory =
 export interface Field {
   id: string;
   name: Localizable;
-  color: string;
-  icon: string;
 }
 
 export interface Skill {

@@ -1,4 +1,13 @@
+@import "@fontsource-variable/inter";
+@import "@fontsource-variable/space-grotesk";
 @import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-display:
+    "Space Grotesk Variable", "Inter Variable", ui-sans-serif, system-ui,
+    sans-serif;
+}
 
 :root {
   color-scheme: light;
@@ -8,6 +17,27 @@ html {
   scroll-behavior: smooth;
 }
 
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}
+
+/* Esconde a barra de scroll do browser quando a barra de contactos (xl+) está visível */
+@media (min-width: 1280px) {
+  html.rail-active {
+    scrollbar-width: none;
+  }
+  html.rail-active::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* Selo do React Flow sem fundo, para não destoar do preto da secção */
+.react-flow__attribution {
+  background: transparent !important;
+}
+
 body {
-  @apply bg-white text-slate-900;
+  @apply bg-white text-slate-900 antialiased;
 }

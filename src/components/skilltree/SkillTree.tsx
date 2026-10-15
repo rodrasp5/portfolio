@@ -1,10 +1,10 @@
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import {
   ReactFlow,
-  Background,
-  BackgroundVariant,
   Controls,
   ViewportPortal,
+  useReactFlow,
+  useStore,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { useProjects } from "../../lib/projectsContext";
@@ -12,8 +12,27 @@ import CenterNode from "./CenterNode";
 import HubNode from "./HubNode";
 import SkillNode from "./SkillNode";
 import { buildGraph } from "./buildGraph";
+import { COLORS } from "./theme";
 
 const nodeTypes = { center: CenterNode, hub: HubNode, skill: SkillNode };
+
+// Enquadra uma área simétrica à volta do centro (o nó central fica sempre ao meio)
+// e repete quando o contentor muda de tamanho ou os nós mudam
+function Refit({ radius, trigger }: { radius: number; trigger: unknown }) {
+  const { fitBounds } = useReactFlow();
+  const width = useStore((s) => s.width);
+  const height = useStore((s) => s.height);
+
+  useEffect(() => {
+    if (!width || !height) return;
+    void fitBounds(
+      { x: -radius, y: -radius, width: radius * 2, height: radius * 2 },
+      { padding: 0.04, duration: 0 },
+    );
+  }, [fitBounds, width, height, radius, trigger]);
+
+  return null;
+}
 
 interface Props {
   embedded?: boolean; // true: não rouba o scroll nem o toque da página
@@ -25,22 +44,20 @@ export default function SkillTree({
   className = "h-[70vh]",
 }: Props) {
   const { projects } = useProjects();
-  const { nodes, edges, dividers } = useMemo(
+  const { nodes, edges, dividers, radius } = useMemo(
     () => buildGraph(projects),
     [projects],
   );
 
   return (
-    <div
-      className={`w-full overflow-hidden rounded-2xl border border-slate-800 bg-slate-950 ${className}`}
-    >
+    <div className={`w-full overflow-hidden ${className}`}>
       <ReactFlow
         nodes={nodes}
         edges={edges}
         nodeTypes={nodeTypes}
         colorMode="dark"
-        fitView
-        fitViewOptions={{ padding: 0.12 }}
+        proOptions={{ hideAttribution: true }}
+        style={{ background: "transparent" }}
         minZoom={0.2}
         maxZoom={1.5}
         nodesDraggable={false}
@@ -52,12 +69,7 @@ export default function SkillTree({
         zoomOnDoubleClick={!embedded}
         preventScrolling={!embedded}
       >
-        <Background
-          variant={BackgroundVariant.Dots}
-          gap={24}
-          size={1.2}
-          color="#1e293b"
-        />
+        <Refit radius={radius} trigger={nodes} />
         <ViewportPortal>
           <svg
             width="1"
@@ -77,9 +89,9 @@ export default function SkillTree({
                 y1={0}
                 x2={d.x}
                 y2={d.y}
-                stroke="#1e293b"
-                strokeWidth={2}
-                strokeDasharray="8 10"
+                stroke={COLORS.line}
+                strokeWidth={1}
+                strokeDasharray="4 8"
               />
             ))}
           </svg>

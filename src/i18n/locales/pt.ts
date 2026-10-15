@@ -13,7 +13,12 @@ const pt = {
     backHome: "Voltar à home",
     pageTitle: "Skill tree",
   },
-  view: { toList: "Simplificar", toTree: "Ver árvore" },
+  view: {
+    toList: "Simplificar",
+    toTree: "Ver árvore",
+    tree: "Árvore",
+    list: "Lista",
+  },
   tree: {
     level: "Nv. {{level}}",
     locked: "Bloqueada",
@@ -47,7 +52,12 @@ const pt = {
     present: "atual",
     viewCertificate: "Ver certificado",
   },
-  projects: { title: "Projetos" },
+  projects: {
+    title: "Projetos",
+    view: "Ver projeto",
+    empty: "Em breve, novos projetos.",
+  },
+  project: { back: "Voltar aos projetos", notFound: "Projeto não encontrado." },
   status: { concluido: "Concluído", producao: "Em produção" },
   footer: { title: "Contactos", cta: "Vamos falar?" },
   login: {
@@ -86,6 +96,7 @@ const pt = {
     fieldStatus: "Estado",
     fieldDate: "Data",
     fieldFeatured: "Destaque",
+    fieldGallery: "Galeria",
     fieldSkills: "Skills usadas",
     fieldLinks: "Links",
     linkLabelPt: "Etiqueta (PT)",
@@ -94,6 +105,16 @@ const pt = {
     addLink: "Adicionar link",
     removeLink: "Remover",
     saveError: "Não foi possível guardar: {{message}}",
+    galleryHint:
+      "A primeira imagem é a capa do projeto. A ordem aqui é a ordem na página.",
+    addImages: "Adicionar imagens",
+    captionPt: "Descrição ao lado da imagem (PT)",
+    captionEn: "Descrição ao lado da imagem (EN)",
+    sideLeft: "Imagem à esquerda",
+    sideRight: "Imagem à direita",
+    moveUp: "Subir",
+    moveDown: "Descer",
+    removeImage: "Remover",
   },
 };
 
