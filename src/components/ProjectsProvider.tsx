@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { supabase } from "../lib/supabase";
 import { projects as fallback } from "../data/projects";
 import type { Project } from "../data/types";
@@ -12,27 +12,23 @@ export default function ProjectsProvider({
   const [projects, setProjects] = useState<Project[]>(fallback);
   const [loading, setLoading] = useState(Boolean(supabase));
 
-  useEffect(() => {
+  const refresh = useCallback(async () => {
     if (!supabase) return;
-    let alive = true;
-    supabase
+    const { data, error } = await supabase
       .from("projects")
       .select("*")
-      .order("date", { ascending: false })
-      .then(({ data, error }) => {
-        if (!alive) return;
-        if (error)
-          console.warn("Projetos: a usar dados locais.", error.message);
-        else setProjects(data as Project[]);
-        setLoading(false);
-      });
-    return () => {
-      alive = false;
-    };
+      .order("date", { ascending: false });
+    if (error) console.warn("Projetos: a usar dados locais.", error.message);
+    else setProjects(data as Project[]);
+    setLoading(false);
   }, []);
 
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
+
   return (
-    <ProjectsContext.Provider value={{ projects, loading }}>
+    <ProjectsContext.Provider value={{ projects, loading, refresh }}>
       {children}
     </ProjectsContext.Provider>
   );
