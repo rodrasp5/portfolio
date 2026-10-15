@@ -1,14 +1,15 @@
-import { Routes, Route, Navigate } from 'react-router'
-import Navbar from './components/Navbar'
-import Footer from './components/Footer'
-import Home from './pages/Home'
-import SkillTreePage from './pages/SkillTreePage'
-import Login from './pages/Login'
-import Admin from './pages/Admin'
+import { Routes, Route, Navigate } from "react-router";
+import Navbar from "./components/Navbar";
+import Footer from "./components/Footer";
+import ProjectsProvider from "./components/ProjectsProvider";
+import Home from "./pages/Home";
+import SkillTreePage from "./pages/SkillTreePage";
+import Login from "./pages/Login";
+import Admin from "./pages/Admin";
 
 export default function App() {
   return (
-    <>
+    <ProjectsProvider>
       <Navbar />
       <Routes>
         <Route path="/" element={<Home />} />
@@ -18,6 +19,6 @@ export default function App() {
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
       <Footer />
-    </>
-  )
+    </ProjectsProvider>
+  );
 }

@@ -1,20 +1,34 @@
-import { useMemo } from 'react'
-import { ReactFlow, Background, BackgroundVariant, Controls, ViewportPortal } from '@xyflow/react'
-import '@xyflow/react/dist/style.css'
-import CenterNode from './CenterNode'
-import HubNode from './HubNode'
-import SkillNode from './SkillNode'
-import { buildGraph } from './buildGraph'
+import { useMemo } from "react";
+import {
+  ReactFlow,
+  Background,
+  BackgroundVariant,
+  Controls,
+  ViewportPortal,
+} from "@xyflow/react";
+import "@xyflow/react/dist/style.css";
+import { useProjects } from "../../lib/projectsContext";
+import CenterNode from "./CenterNode";
+import HubNode from "./HubNode";
+import SkillNode from "./SkillNode";
+import { buildGraph } from "./buildGraph";
 
-const nodeTypes = { center: CenterNode, hub: HubNode, skill: SkillNode }
+const nodeTypes = { center: CenterNode, hub: HubNode, skill: SkillNode };
 
 interface Props {
-  embedded?: boolean // true: não rouba o scroll nem o toque da página
-  className?: string // altura e margens, ex: 'h-[75vh]'
+  embedded?: boolean; // true: não rouba o scroll nem o toque da página
+  className?: string; // altura e margens, ex: 'h-[75vh]'
 }
 
-export default function SkillTree({ embedded = false, className = 'h-[70vh]' }: Props) {
-  const { nodes, edges, dividers } = useMemo(() => buildGraph(), [])
+export default function SkillTree({
+  embedded = false,
+  className = "h-[70vh]",
+}: Props) {
+  const { projects } = useProjects();
+  const { nodes, edges, dividers } = useMemo(
+    () => buildGraph(projects),
+    [projects],
+  );
 
   return (
     <div
@@ -38,12 +52,23 @@ export default function SkillTree({ embedded = false, className = 'h-[70vh]' }: 
         zoomOnDoubleClick={!embedded}
         preventScrolling={!embedded}
       >
-        <Background variant={BackgroundVariant.Dots} gap={24} size={1.2} color="#1e293b" />
+        <Background
+          variant={BackgroundVariant.Dots}
+          gap={24}
+          size={1.2}
+          color="#1e293b"
+        />
         <ViewportPortal>
           <svg
             width="1"
             height="1"
-            style={{ position: 'absolute', left: 0, top: 0, overflow: 'visible', pointerEvents: 'none' }}
+            style={{
+              position: "absolute",
+              left: 0,
+              top: 0,
+              overflow: "visible",
+              pointerEvents: "none",
+            }}
           >
             {dividers.map((d) => (
               <line
@@ -62,5 +87,5 @@ export default function SkillTree({ embedded = false, className = 'h-[70vh]' }: 
         {!embedded && <Controls showInteractive={false} />}
       </ReactFlow>
     </div>
-  )
+  );
 }
