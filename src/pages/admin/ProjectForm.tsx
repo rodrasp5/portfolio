@@ -1,23 +1,37 @@
 import { useState, type FormEvent } from "react";
 import { useTranslation } from "react-i18next";
-import { fields } from "../../data/fields";
-import { skills } from "../../data/skills";
 import type { GalleryBlock, Project, ProjectStatus } from "../../data/types";
-import {
-  useLocalized,
-  type Lang,
-  type Localizable,
-} from "../../i18n/useLocalized";
+import { type Lang, type Localizable } from "../../i18n/useLocalized";
 import { removeProjectImages, uploadProjectImage } from "../../lib/images";
 import { supabase } from "../../lib/supabase";
+import { Card, Icon } from "./AdminUi";
 import GalleryEditor, { type BlockDraft } from "./GalleryEditor";
+import SkillPicker from "./SkillPicker";
+import { input, labelCls, pill, primaryBtn, secondaryBtn } from "./adminStyles";
 
-const input = "w-full rounded border border-slate-300 px-3 py-2";
-const label = "mb-1 block text-sm font-medium";
+const STATUSES: ProjectStatus[] = ["desenvolvimento", "concluido", "inacabado"];
 
-const STATUSES: ProjectStatus[] = ["producao", "concluido"];
+type LinkType = "repo" | "demo" | "site" | "other";
+
+// Tipos de link com texto já definido (só é preciso escrever o endereço)
+const PRESETS: Record<
+  Exclude<LinkType, "other">,
+  { pt: string; en: string }
+> = {
+  repo: { pt: "Código", en: "Code" },
+  demo: { pt: "Demo", en: "Demo" },
+  site: { pt: "Website", en: "Website" },
+};
+const LINK_TYPES: LinkType[] = ["repo", "demo", "site", "other"];
+const LINK_KEYS: Record<LinkType, string> = {
+  repo: "admin.linkRepo",
+  demo: "admin.linkDemo",
+  site: "admin.linkSite",
+  other: "admin.linkOther",
+};
 
 interface LinkRow {
+  type: LinkType;
   labelPt: string;
   labelEn: string;
   url: string;
@@ -41,6 +55,27 @@ const toCaption = (pt: string, en: string): Localizable => {
   return { pt: p || e, en: e || p };
 };
 
+// Reconhece links guardados antes dos tipos existirem
+function toLinkRow(k: Project["links"][number]): LinkRow {
+  const labelPt = pick(k.label, "pt");
+  const labelEn = pick(k.label, "en");
+  const type =
+    (Object.keys(PRESETS) as (keyof typeof PRESETS)[]).find(
+      (p) => PRESETS[p].pt === labelPt,
+    ) ?? "other";
+  return { type, labelPt, labelEn, url: k.url };
+}
+
+function toLink(k: LinkRow): Project["links"][number] {
+  if (k.type !== "other") {
+    const { pt, en } = PRESETS[k.type];
+    return { label: pt === en ? pt : { pt, en }, url: k.url.trim() };
+  }
+  const pt = k.labelPt.trim() || "Link";
+  const en = k.labelEn.trim();
+  return { label: en && en !== pt ? { pt, en } : pt, url: k.url.trim() };
+}
+
 const messageOf = (err: unknown) =>
   err && typeof err === "object" && "message" in err
     ? String(err.message)
@@ -54,11 +89,10 @@ interface Props {
 
 export default function ProjectForm({ project, onSaved, onCancel }: Props) {
   const { t } = useTranslation();
-  const { l } = useLocalized();
 
   const [name, setName] = useState(project ? pick(project.name, "pt") : "");
   const [slug, setSlug] = useState(project?.slug ?? "");
-  const [slugTouched, setSlugTouched] = useState(false);
+  const [editingSlug, setEditingSlug] = useState(false);
   const [descPt, setDescPt] = useState(
     project ? pick(project.description, "pt") : "",
   );
@@ -66,19 +100,16 @@ export default function ProjectForm({ project, onSaved, onCancel }: Props) {
     project ? pick(project.description, "en") : "",
   );
   const [status, setStatus] = useState<ProjectStatus>(
-    project?.status ?? "producao",
+    project?.status ?? "desenvolvimento",
   );
   const [date, setDate] = useState(project?.date ?? thisMonth());
+  const [endDate, setEndDate] = useState(project?.endDate ?? "");
   const [featured, setFeatured] = useState(project?.featured ?? false);
   const [selected, setSelected] = useState<Set<string>>(
     new Set(project?.skills ?? []),
   );
   const [links, setLinks] = useState<LinkRow[]>(
-    project?.links.map((k) => ({
-      labelPt: pick(k.label, "pt"),
-      labelEn: pick(k.label, "en"),
-      url: k.url,
-    })) ?? [],
+    project?.links.map(toLinkRow) ?? [],
   );
   const [blocks, setBlocks] = useState<BlockDraft[]>(() =>
     (project?.gallery ?? []).map((b) => ({
@@ -91,11 +122,20 @@ export default function ProjectForm({ project, onSaved, onCancel }: Props) {
     })),
   );
   const [busy, setBusy] = useState(false);
+  const [progress, setProgress] = useState("");
   const [error, setError] = useState("");
+
+  const hasEnd = status !== "desenvolvimento";
+  const dateInvalid = hasEnd && endDate !== "" && endDate < date;
 
   function changeName(value: string) {
     setName(value);
-    if (!project && !slugTouched) setSlug(slugify(value));
+    if (!project && !editingSlug) setSlug(slugify(value));
+  }
+
+  function changeStatus(next: ProjectStatus) {
+    setStatus(next);
+    if (next !== "desenvolvimento" && !endDate) setEndDate(thisMonth());
   }
 
   function toggleSkill(id: string) {
@@ -115,18 +155,23 @@ export default function ProjectForm({ project, onSaved, onCancel }: Props) {
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
-    if (!supabase) return;
+    if (!supabase || dateInvalid) return;
     setBusy(true);
     setError("");
 
     const uploaded: string[] = []; // imagens enviadas nesta tentativa (apagadas se falhar)
     const gallery: GalleryBlock[] = [];
+    const toUpload = blocks.filter((b) => b.file).length;
+    let sent = 0;
 
     try {
       // 1. Envia as imagens novas, por ordem
       for (const b of blocks) {
         let image = b.image;
         if (b.file) {
+          setProgress(
+            t("admin.uploading", { current: ++sent, total: toUpload }),
+          );
           image = await uploadProjectImage(b.file, slug);
           uploaded.push(image);
         }
@@ -136,6 +181,7 @@ export default function ProjectForm({ project, onSaved, onCancel }: Props) {
           side: b.side,
         });
       }
+      setProgress("");
 
       // 2. Guarda o projeto
       const row: Project = {
@@ -144,18 +190,10 @@ export default function ProjectForm({ project, onSaved, onCancel }: Props) {
         description: { pt: descPt.trim(), en: descEn.trim() || descPt.trim() },
         status,
         gallery,
-        links: links
-          .filter((k) => k.url.trim())
-          .map((k) => {
-            const pt = k.labelPt.trim() || "Link";
-            const en = k.labelEn.trim();
-            return {
-              label: en && en !== pt ? { pt, en } : pt,
-              url: k.url.trim(),
-            };
-          }),
+        links: links.filter((k) => k.url.trim()).map(toLink),
         skills: [...selected],
         date,
+        endDate: hasEnd ? endDate || null : null,
         featured,
       };
 
@@ -165,6 +203,7 @@ export default function ProjectForm({ project, onSaved, onCancel }: Props) {
       if (err) throw err;
     } catch (err) {
       await removeProjectImages(uploaded);
+      setProgress("");
       setError(messageOf(err));
       setBusy(false);
       return;
@@ -181,205 +220,298 @@ export default function ProjectForm({ project, onSaved, onCancel }: Props) {
   }
 
   return (
-    <form onSubmit={(e) => void handleSubmit(e)} className="mt-8 space-y-5">
-      <h2 className="text-lg font-semibold">
-        {project ? t("admin.editProject") : t("admin.newProject")}
-      </h2>
-
+    <form onSubmit={(e) => void handleSubmit(e)} className="mt-6 space-y-6">
       <div>
-        <label className={label}>{t("admin.fieldName")}</label>
-        <input
-          required
-          value={name}
-          onChange={(e) => changeName(e.target.value)}
-          className={input}
-        />
+        <button
+          type="button"
+          onClick={onCancel}
+          className="text-sm text-slate-500 transition hover:text-slate-900"
+        >
+          ← {t("admin.back")}
+        </button>
+        <h2 className="font-display mt-2 text-2xl font-semibold tracking-tight">
+          {project ? t("admin.editProject") : t("admin.newProject")}
+        </h2>
       </div>
 
-      <div>
-        <label className={label}>{t("admin.fieldSlug")}</label>
-        <input
-          required
-          value={slug}
-          disabled={Boolean(project)}
-          pattern="[a-z0-9\-]+"
-          onChange={(e) => {
-            setSlugTouched(true);
-            setSlug(slugify(e.target.value));
-          }}
-          className={`${input} disabled:bg-slate-100 disabled:text-slate-500`}
-        />
-      </div>
-
-      <div>
-        <label className={label}>{t("admin.fieldDescPt")}</label>
-        <textarea
-          required
-          rows={4}
-          value={descPt}
-          onChange={(e) => setDescPt(e.target.value)}
-          className={input}
-        />
-      </div>
-
-      <div>
-        <label className={label}>{t("admin.fieldDescEn")}</label>
-        <textarea
-          rows={4}
-          value={descEn}
-          onChange={(e) => setDescEn(e.target.value)}
-          className={input}
-        />
-      </div>
-
-      <div className="grid gap-4 sm:grid-cols-2">
+      <Card title={t("admin.sectionBasics")}>
         <div>
-          <label className={label}>{t("admin.fieldStatus")}</label>
-          <select
-            value={status}
-            onChange={(e) => setStatus(e.target.value as ProjectStatus)}
-            className={input}
-          >
-            {STATUSES.map((s) => (
-              <option key={s} value={s}>
-                {t(`status.${s}`)}
-              </option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <label className={label}>{t("admin.fieldDate")}</label>
+          <label className={labelCls} htmlFor="p-name">
+            {t("admin.fieldName")}
+          </label>
           <input
+            id="p-name"
             required
-            type="month"
-            pattern="\d{4}-\d{2}"
-            value={date}
-            onChange={(e) => setDate(e.target.value)}
+            value={name}
+            onChange={(e) => changeName(e.target.value)}
+            className={input}
+          />
+          <div className="mt-2 text-xs text-slate-500">
+            {editingSlug && !project ? (
+              <input
+                aria-label={t("admin.fieldSlug")}
+                required
+                value={slug}
+                pattern="[a-z0-9\-]+"
+                onChange={(e) => setSlug(slugify(e.target.value))}
+                className={`${input} !py-1.5`}
+              />
+            ) : (
+              <p>
+                {t("admin.slugPreview")}:{" "}
+                <span className="font-mono">/projetos/{slug || "..."}</span>
+                {!project && (
+                  <button
+                    type="button"
+                    onClick={() => setEditingSlug(true)}
+                    className="ml-2 underline underline-offset-2"
+                  >
+                    {t("admin.slugEdit")}
+                  </button>
+                )}
+              </p>
+            )}
+          </div>
+        </div>
+
+        <div>
+          <label className={labelCls} htmlFor="p-pt">
+            {t("admin.fieldDescPt")}
+          </label>
+          <textarea
+            id="p-pt"
+            required
+            rows={4}
+            value={descPt}
+            onChange={(e) => setDescPt(e.target.value)}
             className={input}
           />
         </div>
-      </div>
 
-      <label className="flex items-center gap-2 text-sm">
-        <input
-          type="checkbox"
-          checked={featured}
-          onChange={(e) => setFeatured(e.target.checked)}
-        />
-        {t("admin.fieldFeatured")}
-      </label>
-
-      <fieldset>
-        <legend className={label}>{t("admin.fieldGallery")}</legend>
-        <GalleryEditor blocks={blocks} onChange={setBlocks} />
-      </fieldset>
-
-      <fieldset>
-        <legend className={label}>{t("admin.fieldSkills")}</legend>
-        <div className="space-y-3">
-          {fields.map((f) => (
-            <div key={f.id}>
-              <p className="mb-1 text-xs font-medium text-slate-500">
-                {l(f.name)}
-              </p>
-              <div className="flex flex-wrap gap-2">
-                {skills
-                  .filter((s) => s.field === f.id)
-                  .map((s) => (
-                    <label
-                      key={s.id}
-                      className={`cursor-pointer rounded border px-2 py-1 text-xs ${
-                        selected.has(s.id)
-                          ? "border-black bg-black text-white"
-                          : "border-slate-300"
-                      }`}
-                    >
-                      <input
-                        type="checkbox"
-                        className="sr-only"
-                        checked={selected.has(s.id)}
-                        onChange={() => toggleSkill(s.id)}
-                      />
-                      {s.name}
-                    </label>
-                  ))}
-              </div>
-            </div>
-          ))}
+        <div>
+          <label className={labelCls} htmlFor="p-en">
+            {t("admin.fieldDescEn")}
+          </label>
+          <textarea
+            id="p-en"
+            rows={4}
+            value={descEn}
+            onChange={(e) => setDescEn(e.target.value)}
+            className={input}
+          />
+          <p className="mt-1.5 text-xs text-slate-500">
+            {t("admin.descEnHint")}
+          </p>
         </div>
-      </fieldset>
+      </Card>
 
-      <fieldset>
-        <legend className={label}>{t("admin.fieldLinks")}</legend>
-        <div className="space-y-3">
-          {links.map((k, i) => (
-            <div key={i} className="grid gap-2 sm:grid-cols-[1fr_1fr_2fr_auto]">
-              <input
-                placeholder={t("admin.linkLabelPt")}
-                value={k.labelPt}
-                onChange={(e) => changeLink(i, { labelPt: e.target.value })}
-                className={input}
-              />
-              <input
-                placeholder={t("admin.linkLabelEn")}
-                value={k.labelEn}
-                onChange={(e) => changeLink(i, { labelEn: e.target.value })}
-                className={input}
-              />
-              <input
-                type="url"
-                placeholder={t("admin.linkUrl")}
-                value={k.url}
-                onChange={(e) => changeLink(i, { url: e.target.value })}
-                className={input}
-              />
-              <button
-                type="button"
-                onClick={() =>
-                  setLinks((prev) => prev.filter((_, j) => j !== i))
-                }
-                className="text-sm underline"
-              >
-                {t("admin.removeLink")}
-              </button>
-            </div>
-          ))}
-        </div>
-        <button
-          type="button"
-          onClick={() =>
-            setLinks((prev) => [...prev, { labelPt: "", labelEn: "", url: "" }])
-          }
-          className="mt-3 text-sm underline"
+      <Card title={t("admin.sectionStatus")}>
+        <div
+          role="radiogroup"
+          aria-label={t("admin.fieldStatus")}
+          className="grid gap-3 sm:grid-cols-3"
         >
-          {t("admin.addLink")}
-        </button>
-      </fieldset>
+          {STATUSES.map((s) => {
+            const on = status === s;
+            return (
+              <button
+                key={s}
+                type="button"
+                role="radio"
+                aria-checked={on}
+                onClick={() => changeStatus(s)}
+                className={`rounded-xl border p-4 text-left transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900 ${
+                  on
+                    ? "border-slate-900 bg-slate-900 text-white"
+                    : "border-slate-200 hover:border-slate-400"
+                }`}
+              >
+                <span className="block text-sm font-medium">
+                  {t(`status.${s}`)}
+                </span>
+                <span
+                  className={`mt-1 block text-xs ${on ? "text-slate-300" : "text-slate-500"}`}
+                >
+                  {t(`projects.hints.${s}`)}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        <div
+          className={`grid gap-4 ${hasEnd ? "sm:grid-cols-2" : "sm:max-w-xs"}`}
+        >
+          <div>
+            <label className={labelCls} htmlFor="p-start">
+              {t("admin.fieldStart")}
+            </label>
+            <input
+              id="p-start"
+              required
+              type="month"
+              pattern="\d{4}-\d{2}"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+              className={input}
+            />
+          </div>
+          {hasEnd && (
+            <div>
+              <label className={labelCls} htmlFor="p-end">
+                {status === "concluido"
+                  ? t("admin.fieldEndDone")
+                  : t("admin.fieldEndStopped")}
+              </label>
+              <input
+                id="p-end"
+                required
+                type="month"
+                pattern="\d{4}-\d{2}"
+                min={date}
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                className={input}
+              />
+            </div>
+          )}
+        </div>
+        {dateInvalid && (
+          <p role="alert" className="text-sm text-red-700">
+            {t("admin.dateError")}
+          </p>
+        )}
+
+        <label className="flex cursor-pointer items-center gap-2.5 text-sm">
+          <input
+            type="checkbox"
+            checked={featured}
+            onChange={(e) => setFeatured(e.target.checked)}
+            className="h-4 w-4 accent-slate-900"
+          />
+          {t("admin.fieldFeatured")}
+        </label>
+      </Card>
+
+      <Card title={t("admin.fieldGallery")}>
+        <GalleryEditor blocks={blocks} onChange={setBlocks} />
+      </Card>
+
+      <Card title={t("admin.fieldSkills")}>
+        <SkillPicker selected={selected} onToggle={toggleSkill} />
+      </Card>
+
+      <Card title={t("admin.fieldLinks")}>
+        {links.length > 0 && (
+          <ul className="space-y-4">
+            {links.map((k, i) => (
+              <li
+                key={i}
+                className="space-y-2 rounded-xl border border-slate-200 p-3"
+              >
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex flex-wrap gap-2" role="group">
+                    {LINK_TYPES.map((type) => (
+                      <button
+                        key={type}
+                        type="button"
+                        aria-pressed={k.type === type}
+                        onClick={() => changeLink(i, { type })}
+                        className={pill(k.type === type)}
+                      >
+                        {t(LINK_KEYS[type])}
+                      </button>
+                    ))}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setLinks((prev) => prev.filter((_, j) => j !== i))
+                    }
+                    aria-label={t("admin.removeLink")}
+                    title={t("admin.removeLink")}
+                    className="rounded-full p-2 text-slate-500 transition hover:bg-red-50 hover:text-red-700"
+                  >
+                    <Icon name="trash" />
+                  </button>
+                </div>
+                {k.type === "other" && (
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <input
+                      placeholder={t("admin.linkLabelPt")}
+                      value={k.labelPt}
+                      onChange={(e) =>
+                        changeLink(i, { labelPt: e.target.value })
+                      }
+                      className={input}
+                    />
+                    <input
+                      placeholder={t("admin.linkLabelEn")}
+                      value={k.labelEn}
+                      onChange={(e) =>
+                        changeLink(i, { labelEn: e.target.value })
+                      }
+                      className={input}
+                    />
+                  </div>
+                )}
+                <input
+                  type="url"
+                  placeholder={t("admin.linkUrl")}
+                  value={k.url}
+                  onChange={(e) => changeLink(i, { url: e.target.value })}
+                  className={input}
+                />
+              </li>
+            ))}
+          </ul>
+        )}
+        <div className="flex flex-wrap gap-2">
+          {LINK_TYPES.map((type) => (
+            <button
+              key={type}
+              type="button"
+              onClick={() =>
+                setLinks((prev) => [
+                  ...prev,
+                  { type, labelPt: "", labelEn: "", url: "" },
+                ])
+              }
+              className="inline-flex items-center gap-1.5 rounded-full border border-dashed border-slate-300 px-3.5 py-1.5 text-xs font-medium text-slate-600 transition hover:border-slate-900 hover:text-slate-900"
+            >
+              <Icon name="plus" size={12} />
+              {t(LINK_KEYS[type])}
+            </button>
+          ))}
+        </div>
+      </Card>
 
       {error && (
         <div
           role="alert"
-          className="rounded border border-red-300 bg-red-50 p-3 text-sm text-red-800"
+          className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800"
         >
           {t("admin.saveError", { message: error })}
         </div>
       )}
 
-      <div className="flex gap-3">
+      <div className="sticky bottom-0 -mx-4 flex flex-wrap items-center gap-3 border-t border-slate-200 bg-white/90 px-4 py-3 backdrop-blur">
         <button
           type="submit"
-          disabled={busy}
-          className="rounded bg-black px-4 py-2 text-white disabled:opacity-50"
+          disabled={busy || dateInvalid}
+          className={primaryBtn}
         >
           {busy ? t("admin.saving") : t("admin.save")}
         </button>
         <button
           type="button"
           onClick={onCancel}
-          className="rounded border border-slate-300 px-4 py-2"
+          disabled={busy}
+          className={secondaryBtn}
         >
           {t("admin.cancel")}
         </button>
+        {progress && <span className="text-sm text-slate-500">{progress}</span>}
       </div>
     </form>
   );

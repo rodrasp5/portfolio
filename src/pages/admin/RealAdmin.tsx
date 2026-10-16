@@ -44,14 +44,21 @@ export default function RealAdmin({ session }: { session: Session }) {
   }
 
   return (
-    <main className="mx-auto max-w-2xl px-4 py-8">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">{t("admin.title")}</h1>
-        <button onClick={() => void logout()} className="text-sm underline">
+    <main className="mx-auto max-w-3xl px-4 py-10">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="font-display text-3xl font-bold tracking-tight">
+            {t("admin.title")}
+          </h1>
+          <p className="mt-1 text-sm text-slate-500">{session.user.email}</p>
+        </div>
+        <button
+          onClick={() => void logout()}
+          className="rounded-full border border-slate-200 px-4 py-1.5 text-sm transition hover:border-slate-900"
+        >
           {t("admin.logout")}
         </button>
       </div>
-      <p className="mt-2 text-sm text-slate-500">{session.user.email}</p>
 
       {editing === null ? (
         <ProjectList

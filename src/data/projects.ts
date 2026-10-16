@@ -8,7 +8,7 @@ export const projects: Project[] = [
       pt: "Descrição curta do projeto.",
       en: "Short description of the project.",
     },
-    status: "producao",
+    status: "desenvolvimento",
     gallery: [
       { image: "/projects/exemplo-1.webp", caption: "", side: "right" },
     ],

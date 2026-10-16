@@ -1,5 +1,13 @@
-import type { ChangeEvent } from "react";
+import {
+  useRef,
+  useState,
+  type ChangeEvent,
+  type DragEvent,
+  type KeyboardEvent,
+} from "react";
 import { useTranslation } from "react-i18next";
+import { Icon } from "./AdminUi";
+import { input, pill } from "./adminStyles";
 
 type Side = "left" | "right";
 
@@ -18,14 +26,16 @@ interface Props {
   onChange: (blocks: BlockDraft[]) => void;
 }
 
-const input = "w-full rounded border border-slate-300 px-3 py-2 text-sm";
+const iconBtn =
+  "rounded-full p-2 text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 disabled:opacity-30 disabled:hover:bg-transparent";
 
 export default function GalleryEditor({ blocks, onChange }: Props) {
   const { t } = useTranslation();
+  const fileInput = useRef<HTMLInputElement>(null);
+  const [dragging, setDragging] = useState(false);
 
-  function addFiles(e: ChangeEvent<HTMLInputElement>) {
-    const files = Array.from(e.target.files ?? []);
-    e.target.value = "";
+  function addFiles(list: File[]) {
+    const files = list.filter((f) => f.type.startsWith("image/"));
     if (!files.length) return;
 
     let side: Side =
@@ -47,6 +57,25 @@ export default function GalleryEditor({ blocks, onChange }: Props) {
     onChange([...blocks, ...added]);
   }
 
+  function onPick(e: ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(e.target.files ?? []);
+    e.target.value = "";
+    addFiles(files);
+  }
+
+  function onDrop(e: DragEvent) {
+    e.preventDefault();
+    setDragging(false);
+    addFiles(Array.from(e.dataTransfer.files));
+  }
+
+  function onDropzoneKey(e: KeyboardEvent) {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      fileInput.current?.click();
+    }
+  }
+
   function patch(index: number, change: Partial<BlockDraft>) {
     onChange(blocks.map((b, i) => (i === index ? { ...b, ...change } : b)));
   }
@@ -66,82 +95,139 @@ export default function GalleryEditor({ blocks, onChange }: Props) {
   }
 
   return (
-    <div>
-      <p className="mb-3 text-xs text-slate-500">{t("admin.galleryHint")}</p>
+    <div className="space-y-4">
+      <p className="text-sm text-slate-500">{t("admin.galleryHint")}</p>
 
-      <ul className="space-y-4">
-        {blocks.map((b, i) => (
-          <li key={b.key} className="rounded border border-slate-200 p-3">
-            <div className="grid gap-3 sm:grid-cols-[10rem_1fr]">
-              <img
-                src={b.image}
-                alt=""
-                className="aspect-video w-full rounded bg-slate-100 object-cover"
-              />
-              <div className="space-y-2">
-                <textarea
-                  rows={2}
-                  placeholder={t("admin.captionPt")}
-                  value={b.captionPt}
-                  onChange={(e) => patch(i, { captionPt: e.target.value })}
-                  className={input}
-                />
-                <textarea
-                  rows={2}
-                  placeholder={t("admin.captionEn")}
-                  value={b.captionEn}
-                  onChange={(e) => patch(i, { captionEn: e.target.value })}
-                  className={input}
-                />
-                <select
-                  value={b.side}
-                  onChange={(e) => patch(i, { side: e.target.value as Side })}
-                  className={input}
-                >
-                  <option value="left">{t("admin.sideLeft")}</option>
-                  <option value="right">{t("admin.sideRight")}</option>
-                </select>
+      {blocks.length > 0 && (
+        <ul className="space-y-4">
+          {blocks.map((b, i) => (
+            <li
+              key={b.key}
+              className="overflow-hidden rounded-xl border border-slate-200"
+            >
+              <div className="grid sm:grid-cols-[13rem_1fr]">
+                <div className="relative bg-slate-100">
+                  <img
+                    src={b.image}
+                    alt=""
+                    className="h-full min-h-36 w-full object-cover"
+                  />
+                  <span className="absolute left-2 top-2 rounded-full bg-black/70 px-2.5 py-0.5 text-xs text-white">
+                    {i === 0 ? t("admin.cover") : i + 1}
+                  </span>
+                </div>
+
+                <div className="space-y-3 p-4">
+                  <textarea
+                    rows={2}
+                    placeholder={t("admin.captionPt")}
+                    value={b.captionPt}
+                    onChange={(e) => patch(i, { captionPt: e.target.value })}
+                    className={input}
+                  />
+                  <textarea
+                    rows={2}
+                    placeholder={t("admin.captionEn")}
+                    value={b.captionEn}
+                    onChange={(e) => patch(i, { captionEn: e.target.value })}
+                    className={input}
+                  />
+
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div className="flex gap-2" role="group">
+                      <button
+                        type="button"
+                        aria-pressed={b.side === "left"}
+                        onClick={() => patch(i, { side: "left" })}
+                        className={pill(b.side === "left")}
+                      >
+                        {t("admin.sideLeft")}
+                      </button>
+                      <button
+                        type="button"
+                        aria-pressed={b.side === "right"}
+                        onClick={() => patch(i, { side: "right" })}
+                        className={pill(b.side === "right")}
+                      >
+                        {t("admin.sideRight")}
+                      </button>
+                    </div>
+                    <div className="flex">
+                      <button
+                        type="button"
+                        onClick={() => move(i, -1)}
+                        disabled={i === 0}
+                        aria-label={t("admin.moveUp")}
+                        title={t("admin.moveUp")}
+                        className={iconBtn}
+                      >
+                        <Icon name="up" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => move(i, 1)}
+                        disabled={i === blocks.length - 1}
+                        aria-label={t("admin.moveDown")}
+                        title={t("admin.moveDown")}
+                        className={iconBtn}
+                      >
+                        <Icon name="down" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => remove(i)}
+                        aria-label={t("admin.removeImage")}
+                        title={t("admin.removeImage")}
+                        className={`${iconBtn} hover:!bg-red-50 hover:!text-red-700`}
+                      >
+                        <Icon name="trash" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
               </div>
-            </div>
-            <div className="mt-3 flex gap-4 text-sm">
-              <button
-                type="button"
-                onClick={() => move(i, -1)}
-                disabled={i === 0}
-                className="underline disabled:opacity-30"
-              >
-                {t("admin.moveUp")}
-              </button>
-              <button
-                type="button"
-                onClick={() => move(i, 1)}
-                disabled={i === blocks.length - 1}
-                className="underline disabled:opacity-30"
-              >
-                {t("admin.moveDown")}
-              </button>
-              <button
-                type="button"
-                onClick={() => remove(i)}
-                className="text-red-700 underline"
-              >
-                {t("admin.removeImage")}
-              </button>
-            </div>
-          </li>
-        ))}
-      </ul>
+            </li>
+          ))}
+        </ul>
+      )}
 
-      <label className="mt-3 inline-block cursor-pointer text-sm underline">
-        {t("admin.addImages")}
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={() => fileInput.current?.click()}
+        onKeyDown={onDropzoneKey}
+        onDragOver={(e) => {
+          e.preventDefault();
+          setDragging(true);
+        }}
+        onDragLeave={() => setDragging(false)}
+        onDrop={onDrop}
+        className={`flex cursor-pointer flex-col items-center gap-1 rounded-xl border-2 border-dashed px-4 text-center transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-900 ${
+          blocks.length ? "py-5" : "py-10"
+        } ${
+          dragging
+            ? "border-slate-900 bg-slate-50"
+            : "border-slate-200 text-slate-500 hover:border-slate-400"
+        }`}
+      >
+        <Icon name="image" size={22} />
+        <p className="text-sm font-medium text-slate-800">
+          {t("admin.dropTitle")}
+        </p>
+        <p className="text-xs">{t("admin.dropOr")}</p>
+        {!blocks.length && (
+          <p className="mt-1 text-xs text-slate-400">{t("admin.dropHint")}</p>
+        )}
         <input
+          ref={fileInput}
           type="file"
           accept="image/*"
           multiple
           className="sr-only"
-          onChange={addFiles}
+          tabIndex={-1}
+          onChange={onPick}
         />
-      </label>
+      </div>
     </div>
   );
 }

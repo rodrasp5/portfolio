@@ -26,7 +26,7 @@ export interface ProjectLink {
   url: string;
 }
 
-export type ProjectStatus = "concluido" | "producao";
+export type ProjectStatus = "concluido" | "desenvolvimento" | "inacabado";
 
 // Bloco da galeria: imagem com descrição ao lado, à esquerda ou à direita
 export interface GalleryBlock {
@@ -43,6 +43,7 @@ export interface Project {
   gallery: GalleryBlock[];
   links: ProjectLink[];
   skills: string[]; // ids de Skill usadas neste projeto
-  date: string; // 'YYYY-MM'
+  date: string; // início, 'YYYY-MM'
+  endDate?: string | null; // fim, 'YYYY-MM' (vazio se ainda em desenvolvimento)
   featured?: boolean;
 }

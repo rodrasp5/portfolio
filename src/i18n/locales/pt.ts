@@ -14,14 +14,11 @@ const pt = {
     pageTitle: "Skill tree",
   },
   view: {
-    toList: "Simplificar",
-    toTree: "Ver árvore",
     tree: "Árvore",
     list: "Lista",
   },
   tree: {
     level: "Nv. {{level}}",
-    locked: "Bloqueada",
     base: "Base",
     projects_one: "{{count}} projeto",
     projects_other: "{{count}} projetos",
@@ -56,9 +53,27 @@ const pt = {
     title: "Projetos",
     view: "Ver projeto",
     empty: "Em breve, novos projetos.",
+    groups: {
+      concluido: "Concluídos",
+      desenvolvimento: "Em desenvolvimento",
+      inacabado: "Inacabados",
+    },
+    hints: {
+      concluido: "Prontos e funcionais",
+      desenvolvimento: "Ainda a ser trabalhados",
+      inacabado: "Ficaram a meio, mas com aprendizagens",
+    },
   },
-  project: { back: "Voltar aos projetos", notFound: "Projeto não encontrado." },
-  status: { concluido: "Concluído", producao: "Em produção" },
+  project: {
+    back: "Voltar aos projetos",
+    notFound: "Projeto não encontrado.",
+    since: "desde {{date}}",
+  },
+  status: {
+    concluido: "Concluído",
+    desenvolvimento: "Em desenvolvimento",
+    inacabado: "Inacabado",
+  },
   footer: { title: "Contactos", cta: "Vamos falar?" },
   login: {
     title: "Login",
@@ -68,46 +83,61 @@ const pt = {
     error: "Credenciais inválidas.",
   },
   admin: {
+    // Geral
     title: "Painel de administração",
     logout: "Sair",
+    back: "Voltar à lista",
+    cancel: "Cancelar",
+    save: "Guardar projeto",
+    saving: "A guardar...",
+    saveError: "Não foi possível guardar: {{message}}",
+    uploading: "A enviar imagem {{current}} de {{total}}...",
+
     // Formulário falso (piada)
     name: "Nome do projeto",
     description: "Descrição",
     link: "Link (GitHub, demo...)",
     tech: "Tecnologias e ferramentas (separadas por vírgulas)",
-    save: "Guardar projeto",
-    saving: "A guardar...",
     errorTitle: "Erro 403: sem permissões de escrita.",
     errorBody:
       "Entraste com uma das passwords mais comuns do mundo, por isso aqui não se guarda nada. Esta tentativa ficou registada nas estatísticas. Boa tentativa!",
-    // Painel real
+
+    // Lista de projetos
     projectsTitle: "Projetos",
     newProject: "Novo projeto",
     editProject: "Editar projeto",
     edit: "Editar",
     delete: "Apagar",
     confirmDelete: "Apagar este projeto? Não dá para desfazer.",
-    cancel: "Cancelar",
     empty: "Ainda não há projetos.",
+
+    // Formulário: informação básica
+    sectionBasics: "Informação básica",
     fieldName: "Nome",
     fieldSlug: "Identificador (usado no URL)",
+    slugPreview: "Endereço",
+    slugEdit: "editar",
     fieldDescPt: "Descrição (português)",
     fieldDescEn: "Descrição (inglês)",
+    descEnHint: "Opcional. Se ficar vazio, usa-se o texto em português.",
+
+    // Formulário: estado e datas
+    sectionStatus: "Estado e datas",
     fieldStatus: "Estado",
-    fieldDate: "Data",
+    fieldStart: "Início",
+    fieldEndDone: "Concluído em",
+    fieldEndStopped: "Parado em",
+    dateError: "A data final não pode ser anterior ao início.",
     fieldFeatured: "Destaque",
+
+    // Formulário: galeria
     fieldGallery: "Galeria",
-    fieldSkills: "Skills usadas",
-    fieldLinks: "Links",
-    linkLabelPt: "Etiqueta (PT)",
-    linkLabelEn: "Etiqueta (EN)",
-    linkUrl: "URL",
-    addLink: "Adicionar link",
-    removeLink: "Remover",
-    saveError: "Não foi possível guardar: {{message}}",
     galleryHint:
       "A primeira imagem é a capa do projeto. A ordem aqui é a ordem na página.",
-    addImages: "Adicionar imagens",
+    dropTitle: "Arrasta imagens para aqui",
+    dropOr: "ou clica para escolher",
+    dropHint: "São reduzidas e convertidas para webp automaticamente.",
+    cover: "Capa",
     captionPt: "Descrição ao lado da imagem (PT)",
     captionEn: "Descrição ao lado da imagem (EN)",
     sideLeft: "Imagem à esquerda",
@@ -115,6 +145,24 @@ const pt = {
     moveUp: "Subir",
     moveDown: "Descer",
     removeImage: "Remover",
+
+    // Formulário: tecnologias
+    fieldSkills: "Skills usadas",
+    skillsSearch: "Pesquisar tecnologias...",
+    skillsSelected: "Selecionadas ({{count}})",
+    skillsNone: "Nenhuma tecnologia encontrada.",
+    skillsOther: "Outros",
+
+    // Formulário: links
+    fieldLinks: "Links",
+    linkRepo: "Repositório",
+    linkDemo: "Demo",
+    linkSite: "Website",
+    linkOther: "Outro",
+    linkLabelPt: "Etiqueta (PT)",
+    linkLabelEn: "Etiqueta (EN)",
+    linkUrl: "URL",
+    removeLink: "Remover",
   },
 };
 

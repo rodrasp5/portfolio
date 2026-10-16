@@ -15,10 +15,12 @@ const en: typeof pt = {
     backHome: "Back to home",
     pageTitle: "Skill tree",
   },
-  view: { toList: "Simplify", toTree: "View tree", tree: "Tree", list: "List" },
+  view: {
+    tree: "Tree",
+    list: "List",
+  },
   tree: {
     level: "Lv. {{level}}",
-    locked: "Locked",
     base: "Base",
     projects_one: "{{count}} project",
     projects_other: "{{count}} projects",
@@ -53,9 +55,27 @@ const en: typeof pt = {
     title: "Projects",
     view: "View project",
     empty: "New projects coming soon.",
+    groups: {
+      concluido: "Completed",
+      desenvolvimento: "In development",
+      inacabado: "Unfinished",
+    },
+    hints: {
+      concluido: "Finished and working",
+      desenvolvimento: "Still being worked on",
+      inacabado: "Left halfway, but worth the lessons",
+    },
   },
-  project: { back: "Back to projects", notFound: "Project not found." },
-  status: { concluido: "Completed", producao: "In production" },
+  project: {
+    back: "Back to projects",
+    notFound: "Project not found.",
+    since: "since {{date}}",
+  },
+  status: {
+    concluido: "Completed",
+    desenvolvimento: "In development",
+    inacabado: "Unfinished",
+  },
   footer: { title: "Contact", cta: "Let's talk?" },
   login: {
     title: "Login",
@@ -65,46 +85,61 @@ const en: typeof pt = {
     error: "Invalid credentials.",
   },
   admin: {
+    // General
     title: "Admin panel",
     logout: "Sign out",
+    back: "Back to list",
+    cancel: "Cancel",
+    save: "Save project",
+    saving: "Saving...",
+    saveError: "Could not save: {{message}}",
+    uploading: "Uploading image {{current}} of {{total}}...",
+
     // Fake form (the joke)
     name: "Project name",
     description: "Description",
     link: "Link (GitHub, demo...)",
     tech: "Technologies and tools (comma separated)",
-    save: "Save project",
-    saving: "Saving...",
     errorTitle: "Error 403: no write permissions.",
     errorBody:
       "You got in with one of the most common passwords in the world, so nothing gets saved here. This attempt has been logged in the stats. Nice try!",
-    // Real panel
+
+    // Project list
     projectsTitle: "Projects",
     newProject: "New project",
     editProject: "Edit project",
     edit: "Edit",
     delete: "Delete",
     confirmDelete: "Delete this project? This cannot be undone.",
-    cancel: "Cancel",
     empty: "No projects yet.",
+
+    // Form: basics
+    sectionBasics: "Basics",
     fieldName: "Name",
     fieldSlug: "Identifier (used in the URL)",
+    slugPreview: "Address",
+    slugEdit: "edit",
     fieldDescPt: "Description (Portuguese)",
     fieldDescEn: "Description (English)",
+    descEnHint: "Optional. If left empty, the Portuguese text is used.",
+
+    // Form: status and dates
+    sectionStatus: "Status and dates",
     fieldStatus: "Status",
-    fieldDate: "Date",
+    fieldStart: "Start",
+    fieldEndDone: "Finished on",
+    fieldEndStopped: "Stopped on",
+    dateError: "The end date cannot be before the start.",
     fieldFeatured: "Featured",
+
+    // Form: gallery
     fieldGallery: "Gallery",
-    fieldSkills: "Skills used",
-    fieldLinks: "Links",
-    linkLabelPt: "Label (PT)",
-    linkLabelEn: "Label (EN)",
-    linkUrl: "URL",
-    addLink: "Add link",
-    removeLink: "Remove",
-    saveError: "Could not save: {{message}}",
     galleryHint:
       "The first image is the project cover. The order here is the order on the page.",
-    addImages: "Add images",
+    dropTitle: "Drag images here",
+    dropOr: "or click to choose",
+    dropHint: "They are resized and converted to webp automatically.",
+    cover: "Cover",
     captionPt: "Text beside the image (PT)",
     captionEn: "Text beside the image (EN)",
     sideLeft: "Image on the left",
@@ -112,6 +147,24 @@ const en: typeof pt = {
     moveUp: "Move up",
     moveDown: "Move down",
     removeImage: "Remove",
+
+    // Form: technologies
+    fieldSkills: "Skills used",
+    skillsSearch: "Search technologies...",
+    skillsSelected: "Selected ({{count}})",
+    skillsNone: "No technologies found.",
+    skillsOther: "Other",
+
+    // Form: links
+    fieldLinks: "Links",
+    linkRepo: "Repository",
+    linkDemo: "Demo",
+    linkSite: "Website",
+    linkOther: "Other",
+    linkLabelPt: "Label (PT)",
+    linkLabelEn: "Label (EN)",
+    linkUrl: "URL",
+    removeLink: "Remove",
   },
 };
 
